@@ -3,6 +3,7 @@ from asgiref.sync import sync_to_async
 from logging import basicConfig, INFO
 from django.conf import settings
 
+from apps.settings.models import Photo, Movie, Complement
 from apps.telegram.models import TelegramUser
 from apps.telegram.keyboards import start_keyboard
 
@@ -46,3 +47,11 @@ async def get_complement(message:types.Message):
 @dp.message_handler(text='Получить фото')
 async def send_photo(message:types.Message):
     await message.answer('Вот фото')
+
+@dp.message_handler(text='Фильм')
+async def get_movie(message:types.Message):
+    await message.answer("Вот фильм")
+
+@dp.message_handler()
+async def not_found(message:types.Message):
+    await message.reply('Я вас не понял, введите /start')

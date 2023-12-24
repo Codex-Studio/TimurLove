@@ -18,6 +18,11 @@ class TelegramUser(models.Model):
         max_length=200, verbose_name="Фамилия",
         blank=True, null=True
     )
+    partner = models.BooleanField(
+        default=False,
+        verbose_name = "Партнер",
+        help_text="Партнер (если True то локации ему будет отправляться)"
+    )
     created = models.DateTimeField(
         auto_now_add=True, 
         verbose_name="Дата создания",
