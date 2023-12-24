@@ -10,6 +10,10 @@ class Complement(models.Model):
     def __str__(self):
         return self.title 
     
+    @classmethod
+    def get_random(cls):
+        return cls.objects.order_by('?').first()
+
     class Meta:
         verbose_name = 'Комплемент'
         verbose_name_plural = 'комплементы'
@@ -27,6 +31,10 @@ class Photo(models.Model):
 
     def __str__(self):
         return self.title 
+    
+    @classmethod
+    def get_random(cls):
+        return cls.objects.order_by('?').first()
     
     class Meta:
         verbose_name = 'Фото'

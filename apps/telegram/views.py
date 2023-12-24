@@ -1,4 +1,8 @@
 from aiogram import Bot, Dispatcher, types, executor
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.types import InputFile
 from asgiref.sync import sync_to_async
 from logging import basicConfig, INFO
 from django.conf import settings
@@ -9,7 +13,8 @@ from apps.telegram.keyboards import start_keyboard
 
 # Create your views here.
 bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
-dp = Dispatcher(bot)
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
 basicConfig(level=INFO)
 
 """Функция для обработки комманды /start. Если пользователя нету в базе, 
@@ -36,17 +41,48 @@ async def start(message: types.Message):
         # Если пользователь уже существует
         await message.answer(f"С возвращением, {message.from_user.full_name}!", reply_markup=start_keyboard)
 
-@dp.callback_query_handler(text='Добавить фото')
-async def get_photo(message:types.Message):
+class Form(StatesGroup):
+    waiting_for_photo = State()
+
+@dp.message_handler(text='Добавить фото')
+async def get_photo(message: types.Message):
     await message.answer("Отправьте свое фото")
+    await Form.waiting_for_photo.set()
+
+@dp.message_handler(content_types=['photo'], state=Form.waiting_for_photo)
+async def handle_photo(message: types.Message, state: FSMContext):
+    # Получение объекта фотографии
+    photo = message.photo[-1]
+    file_id = photo.file_id
+    file = await bot.get_file(file_id)
+    file_path = file.file_path
+
+    # Скачивание фотографии
+    await bot.download_file(file_path, f"photos/{file_id}.jpg")
+
+    # Создание записи в базе данных
+    new_photo = Photo(title=f"Фото от {message.from_user.username}", image=f"photos/{file_id}.jpg")
+    await sync_to_async(new_photo.save)()
+
+    await message.answer("Фото сохранено в базе данных")
+
+    # Сброс состояния
+    await state.finish()
 
 @dp.message_handler(text='Комплемент')
-async def get_complement(message:types.Message):
-    await message.answer("Комплемент")
+async def get_complement(message: types.Message):
+    complement = await sync_to_async(Complement.get_random)()
+    await message.answer(complement.title if complement else "Комплименты закончились :(")
 
 @dp.message_handler(text='Получить фото')
-async def send_photo(message:types.Message):
-    await message.answer('Вот фото')
+async def send_photo(message: types.Message):
+    random_photo = await sync_to_async(Photo.get_random)()
+
+    if random_photo:
+        photo_path = random_photo.image.path  # Убедитесь, что это правильный путь к файлу
+        await bot.send_photo(message.chat.id, photo=InputFile(photo_path))
+    else:
+        await message.answer("Извините, фото не найдены.")
 
 @dp.message_handler(text='Фильм')
 async def get_movie(message:types.Message):
