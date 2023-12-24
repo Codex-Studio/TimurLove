@@ -5,6 +5,7 @@ start_buttons = [
     KeyboardButton('Комплемент'),
     KeyboardButton('Получить фото'),
     KeyboardButton('Отправить локацию', request_location=True),
+    KeyboardButton('Добавить фильм'),
     KeyboardButton('Фильм')
 ]
 start_keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(*start_buttons)

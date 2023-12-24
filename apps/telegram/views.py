@@ -3,6 +3,7 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import InputFile
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from asgiref.sync import sync_to_async
 from logging import basicConfig, INFO
 from django.conf import settings
@@ -84,9 +85,47 @@ async def send_photo(message: types.Message):
     else:
         await message.answer("Извините, фото не найдены.")
 
-@dp.message_handler(text='Фильм')
+class MovieState(StatesGroup):
+    title = State()
+
+@dp.message_handler(text='Добавить фильм')
 async def get_movie(message:types.Message):
-    await message.answer("Вот фильм")
+    await message.answer("Введите название фильма которое хотите добавить")
+    await MovieState.title.set()
+
+@dp.message_handler(state=MovieState.title)
+async def add_movie_db(message: types.Message, state: FSMContext):
+    movie_title = message.text  # Получение названия фильма из сообщения
+
+    # Создание и сохранение нового объекта Movie
+    new_movie = Movie(title=movie_title)
+    await sync_to_async(new_movie.save)()
+
+    await message.answer(f"Фильм '{movie_title}' успешно добавлен в базу данных!")
+
+    # Сброс состояния
+    await state.finish()
+
+@dp.message_handler(text='Фильм')
+async def get_movie(message: types.Message):
+    random_movie = await sync_to_async(Movie.objects.filter(watched=False).order_by('?').first)()
+
+    if random_movie:
+        keyboard = InlineKeyboardMarkup()
+        keyboard.add(InlineKeyboardButton("Смотрели", callback_data=f"watched_{random_movie.id}"))
+        await message.answer(f"Фильм: {random_movie.title}", reply_markup=keyboard)
+    else:
+        await message.answer("Все фильмы просмотрены.")
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith('watched_'))
+async def mark_movie_watched(callback_query: types.CallbackQuery):
+    movie_id = int(callback_query.data.split('_')[1])
+    movie = await sync_to_async(Movie.objects.get)(id=movie_id)
+    movie.watched = True
+    await sync_to_async(movie.save)()
+
+    await bot.answer_callback_query(callback_query.id)
+    await bot.send_message(callback_query.from_user.id, f"Фильм '{movie.title}' отмечен как просмотренный.")
 
 @dp.message_handler()
 async def not_found(message:types.Message):
